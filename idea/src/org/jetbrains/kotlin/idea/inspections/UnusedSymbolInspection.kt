@@ -52,6 +52,7 @@ import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.idea.references.resolveMainReferenceToDescriptors
 import org.jetbrains.kotlin.idea.search.ideaExtensions.KotlinReferencesSearchParameters
 import org.jetbrains.kotlin.idea.search.isCheapEnoughToSearchConsideringOperators
+import org.jetbrains.kotlin.idea.search.projectScope
 import org.jetbrains.kotlin.idea.search.usagesSearch.dataClassComponentFunction
 import org.jetbrains.kotlin.idea.search.usagesSearch.getAccessorNames
 import org.jetbrains.kotlin.idea.search.usagesSearch.getClassNameForCompanionObject
@@ -191,7 +192,8 @@ class UnusedSymbolInspection : AbstractKotlinInspection() {
     }
 
     private fun hasNonTrivialUsages(declaration: KtNamedDeclaration, descriptor: DeclarationDescriptor? = null): Boolean {
-        val psiSearchHelper = PsiSearchHelper.SERVICE.getInstance(declaration.project)
+        val project = declaration.project
+        val psiSearchHelper = PsiSearchHelper.SERVICE.getInstance(project)
 
         val useScope = declaration.useScope
         val restrictedScope = if (useScope is GlobalSearchScope) {
@@ -207,14 +209,18 @@ class UnusedSymbolInspection : AbstractKotlinInspection() {
                 }
             }
 
-            if (zeroOccurrences) {
+            if (zeroOccurrences && !declaration.hasActualModifier()) {
                 if (declaration is KtObjectDeclaration && declaration.isCompanion()) {
                     // go on: companion object can be used only in containing class
                 } else {
                     return false
                 }
             }
-            KotlinSourceFilterScope.projectSources(useScope, declaration.project)
+            if (declaration.hasActualModifier()) {
+                KotlinSourceFilterScope.projectSources(project.projectScope(), project)
+            } else {
+                KotlinSourceFilterScope.projectSources(useScope, project)
+            }
         } else useScope
 
         return (declaration is KtObjectDeclaration && declaration.isCompanion() &&
